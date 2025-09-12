@@ -8,7 +8,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 240 10% 98%;
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -17,26 +17,51 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    /* Civic Government Blue Theme */
+    --primary: 214 84% 20%;
     --primary-foreground: 210 40% 98%;
+    --primary-glow: 214 84% 35%;
 
-    --secondary: 210 40% 96.1%;
+    /* Indian Saffron Accent */
+    --secondary: 33 100% 50%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96.1%;
+    --muted: 220 14% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Success Green */
+    --accent: 142 76% 36%;
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 214 84% 20%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Custom Civic Design Tokens */
+    --civic-blue: 214 84% 20%;
+    --civic-saffron: 33 100% 50%;
+    --civic-green: 142 76% 36%;
+    --civic-orange: 24 100% 50%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--civic-blue)), hsl(var(--primary-glow)));
+    --gradient-hero: linear-gradient(135deg, hsl(var(--civic-blue)) 0%, hsl(var(--civic-saffron)) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(var(--civic-green)) 0%, hsl(142 76% 45%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(220 14% 99%) 100%);
+    
+    /* Shadows */
+    --shadow-civic: 0 10px 30px -10px hsl(var(--civic-blue) / 0.2);
+    --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.3);
+    --shadow-card: 0 4px 12px hsl(var(--civic-blue) / 0.08);
+    
+    /* Animations */
+    --transition-civic: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --bounce-civic: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --sidebar-background: 0 0% 98%;
 
