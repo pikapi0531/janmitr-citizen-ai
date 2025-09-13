@@ -809,6 +809,10 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
+      increment_upvotes: {
+        Args: { issue_id: string }
+        Returns: undefined
+      }
       json: {
         Args: { "": unknown }
         Returns: Json
