@@ -112,12 +112,21 @@ export const useIssues = () => {
 
   const upvoteIssueMutation = useMutation({
     mutationFn: async (issueId: string) => {
-      const { data, error } = await supabase.rpc('increment_upvotes', {
-        issue_id: issueId
-      });
+      // Get current upvotes and increment by 1
+      const { data: issue, error: fetchError } = await supabase
+        .from('issues')
+        .select('upvotes')
+        .eq('id', issueId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const { error } = await supabase
+        .from('issues')
+        .update({ upvotes: (issue.upvotes || 0) + 1 })
+        .eq('id', issueId);
 
       if (error) throw error;
-      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
