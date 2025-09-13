@@ -1,14 +1,28 @@
-import { Star, Award, TrendingUp, MapPin, Camera, Trophy, Target, Users } from "lucide-react";
+import { Star, Award, TrendingUp, MapPin, Camera, Trophy, Target, Users, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import { useIssues } from "@/hooks/useIssues";
+import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
+  const { user, signOut } = useAuth();
+  const { profile } = useProfile();
+  const { myIssues } = useIssues();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
   const userStats = [
-    { label: "Issues Reported", value: 23, icon: Camera, color: "text-civic-orange" },
-    { label: "Issues Resolved", value: 19, icon: Target, color: "text-civic-green" },
-    { label: "Community Rank", value: 47, icon: Trophy, color: "text-civic-saffron" },
+    { label: "Issues Reported", value: profile?.total_reports || 0, icon: Camera, color: "text-civic-orange" },
+    { label: "Issues Resolved", value: profile?.resolved_reports || 0, icon: Target, color: "text-civic-green" },
+    { label: "Citizen Score", value: profile?.citizen_score || 0, icon: Trophy, color: "text-civic-saffron" },
   ];
 
   const achievements = [
@@ -20,12 +34,30 @@ const Profile = () => {
     { id: 6, title: "Problem Solver", description: "Help resolve 25 issues", icon: "🔧", earned: false },
   ];
 
-  const recentActivity = [
-    { id: 1, action: "Reported pothole on MG Road", points: 50, timeAgo: "2 hours ago" },
-    { id: 2, action: "Issue resolved: Street light repair", points: 25, timeAgo: "1 day ago" },
-    { id: 3, action: "Verified garbage collection issue", points: 15, timeAgo: "2 days ago" },
-    { id: 4, action: "Added photos to water logging report", points: 10, timeAgo: "3 days ago" },
-  ];
+  const recentActivity = myIssues.slice(0, 4).map((issue, index) => ({
+    id: issue.id,
+    action: `Reported: ${issue.title}`,
+    points: 50,
+    timeAgo: formatTimeAgo(issue.created_at)
+  }));
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} minutes ago`;
+    } else if (diffInMinutes < 1440) {
+      return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    } else {
+      return `${Math.floor(diffInMinutes / 1440)} days ago`;
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -33,13 +65,19 @@ const Profile = () => {
       <div className="bg-gradient-primary p-6 text-white">
         <div className="flex items-center gap-4 mb-4">
           <Avatar className="h-16 w-16">
-            <AvatarFallback className="bg-white/20 text-white text-xl">RK</AvatarFallback>
+            <AvatarFallback className="bg-white/20 text-white text-xl">
+              {user && profile?.full_name ? getInitials(profile.full_name) : 'U'}
+            </AvatarFallback>
           </Avatar>
           <div>
-            <h1 className="text-2xl font-bold">Rajesh Kumar</h1>
-            <p className="opacity-90">Citizen ID: CZ001247</p>
+            <h1 className="text-2xl font-bold">
+              {profile?.full_name || user?.email || 'User'}
+            </h1>
+            <p className="opacity-90">Citizen ID: {user?.id.slice(0, 8).toUpperCase()}</p>
             <div className="flex items-center gap-2 mt-1">
-              <Badge className="bg-civic-green text-white">Level 3 Citizen</Badge>
+              <Badge className="bg-civic-green text-white">
+                Level {Math.floor((profile?.citizen_score || 0) / 1000) + 1} Citizen
+              </Badge>
             </div>
           </div>
         </div>
@@ -49,14 +87,17 @@ const Profile = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-white/90">Citizen Score</span>
-              <span className="text-2xl font-bold">2,847</span>
+              <span className="text-2xl font-bold">{profile?.citizen_score || 0}</span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-2 mb-2">
-              <div className="bg-civic-saffron h-2 rounded-full" style={{ width: "85%" }}></div>
+              <div 
+                className="bg-civic-saffron h-2 rounded-full" 
+                style={{ width: `${Math.min(((profile?.citizen_score || 0) % 1000) / 10, 100)}%` }}
+              ></div>
             </div>
             <div className="flex justify-between text-sm text-white/70">
-              <span>Level 3</span>
-              <span>153 to Level 4</span>
+              <span>Level {Math.floor((profile?.citizen_score || 0) / 1000) + 1}</span>
+              <span>{1000 - ((profile?.citizen_score || 0) % 1000)} to next level</span>
             </div>
           </CardContent>
         </Card>
@@ -113,18 +154,24 @@ const Profile = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{activity.action}</div>
-                  <div className="text-xs text-muted-foreground">{activity.timeAgo}</div>
+            {recentActivity.length > 0 ? (
+              recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{activity.action}</div>
+                    <div className="text-xs text-muted-foreground">{activity.timeAgo}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-civic-green">+{activity.points}</div>
+                    <div className="text-xs text-muted-foreground">points</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold text-civic-green">+{activity.points}</div>
-                  <div className="text-xs text-muted-foreground">points</div>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-4 text-muted-foreground">
+                No recent activity
               </div>
-            ))}
+            )}
           </CardContent>
         </Card>
 
@@ -174,7 +221,8 @@ const Profile = () => {
           <Button variant="outline" className="w-full">
             Privacy Settings
           </Button>
-          <Button variant="outline" className="w-full text-destructive">
+          <Button variant="outline" className="w-full text-destructive" onClick={handleSignOut}>
+            <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </Button>
         </div>

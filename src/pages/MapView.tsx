@@ -1,69 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MapPin, Filter, Search, Navigation, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useIssues } from "@/hooks/useIssues";
 
 const MapView = () => {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const { issues, isLoading, upvoteIssue } = useIssues();
+
+  const getFilterCount = (status: string) => {
+    if (status === "all") return issues.length;
+    return issues.filter(issue => issue.status === status).length;
+  };
 
   const filters = [
-    { id: "all", label: "All", count: 156 },
-    { id: "pending", label: "Pending", count: 45 },
-    { id: "progress", label: "In Progress", count: 67 },
-    { id: "resolved", label: "Resolved", count: 44 },
-  ];
-
-  const issues = [
-    {
-      id: 1,
-      type: "Pothole",
-      location: "MG Road, Sector 14",
-      status: "pending",
-      priority: "high",
-      distance: "0.2 km",
-      reportedBy: "Rajesh K.",
-      timeAgo: "2 hours ago",
-    },
-    {
-      id: 2,
-      type: "Street Light",
-      location: "Gandhi Nagar Main",
-      status: "progress",
-      priority: "medium",
-      distance: "0.5 km",
-      reportedBy: "Priya M.",
-      timeAgo: "5 hours ago",
-    },
-    {
-      id: 3,
-      type: "Garbage Collection",
-      location: "City Center Plaza",
-      status: "resolved",
-      priority: "high",
-      distance: "0.8 km",
-      reportedBy: "Amit S.",
-      timeAgo: "1 day ago",
-    },
-    {
-      id: 4,
-      type: "Water Logging",
-      location: "Ring Road Junction",
-      status: "pending",
-      priority: "high",
-      distance: "1.2 km",
-      reportedBy: "Sunita D.",
-      timeAgo: "3 hours ago",
-    },
+    { id: "all", label: "All", count: getFilterCount("all") },
+    { id: "reported", label: "Pending", count: getFilterCount("reported") },
+    { id: "in_progress", label: "In Progress", count: getFilterCount("in_progress") },
+    { id: "resolved", label: "Resolved", count: getFilterCount("resolved") },
   ];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "resolved":
         return <CheckCircle className="h-4 w-4 text-civic-green" />;
-      case "progress":
+      case "in_progress":
         return <Clock className="h-4 w-4 text-civic-saffron" />;
       default:
         return <AlertTriangle className="h-4 w-4 text-civic-orange" />;
@@ -74,7 +38,7 @@ const MapView = () => {
     switch (status) {
       case "resolved":
         return <Badge className="bg-civic-green text-white">Resolved</Badge>;
-      case "progress":
+      case "in_progress":
         return <Badge className="bg-civic-saffron text-white">In Progress</Badge>;
       default:
         return <Badge className="bg-civic-orange text-white">Pending</Badge>;
@@ -83,9 +47,23 @@ const MapView = () => {
 
   const filteredIssues = issues.filter(issue => 
     (selectedFilter === "all" || issue.status === selectedFilter) &&
-    (issue.type.toLowerCase().includes(searchQuery.toLowerCase()) || 
-     issue.location.toLowerCase().includes(searchQuery.toLowerCase()))
+    (issue.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+     (issue.location_address && issue.location_address.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} minutes ago`;
+    } else if (diffInMinutes < 1440) {
+      return `${Math.floor(diffInMinutes / 60)} hours ago`;
+    } else {
+      return `${Math.floor(diffInMinutes / 1440)} days ago`;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -158,42 +136,56 @@ const MapView = () => {
           {filteredIssues.length} Issues Found
         </h2>
         
-        {filteredIssues.map((issue) => (
-          <Card key={issue.id} className="shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-start gap-3">
-                  {getStatusIcon(issue.status)}
-                  <div>
-                    <h3 className="font-medium">{issue.type}</h3>
-                    <p className="text-sm text-muted-foreground flex items-center">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {issue.location}
-                    </p>
+        {isLoading ? (
+          <div className="text-center py-8">Loading issues...</div>
+        ) : filteredIssues.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No issues found matching your criteria
+          </div>
+        ) : (
+          filteredIssues.map((issue) => (
+            <Card key={issue.id} className="shadow-card">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start gap-3">
+                    {getStatusIcon(issue.status)}
+                    <div>
+                      <h3 className="font-medium">{issue.title}</h3>
+                      <p className="text-sm text-muted-foreground flex items-center">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {issue.location_address || "Location not specified"}
+                      </p>
+                    </div>
+                  </div>
+                  {getStatusBadge(issue.status)}
+                </div>
+                
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="flex items-center gap-4">
+                    <span>Priority: {issue.priority}</span>
+                    <span>{formatTimeAgo(issue.created_at)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => upvoteIssue(issue.id)}
+                      className="text-xs"
+                    >
+                      👍 {issue.upvotes}
+                    </Button>
                   </div>
                 </div>
-                {getStatusBadge(issue.status)}
-              </div>
-              
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <div className="flex items-center gap-4">
-                  <span>By {issue.reportedBy}</span>
-                  <span>{issue.timeAgo}</span>
-                </div>
-                <div className="flex items-center">
-                  <Navigation className="h-3 w-3 mr-1" />
-                  {issue.distance}
-                </div>
-              </div>
-              
-              {issue.priority === "high" && (
-                <div className="mt-2">
-                  <Badge variant="destructive" className="text-xs">High Priority</Badge>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                
+                {issue.priority === "critical" && (
+                  <div className="mt-2">
+                    <Badge variant="destructive" className="text-xs">Critical Priority</Badge>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Current Location Button */}

@@ -7,19 +7,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { useIssues } from "@/hooks/useIssues";
+import { useFileUpload } from "@/hooks/useFileUpload";
 
 const ReportIssue = () => {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [title, setTitle] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { createIssue, isCreatingIssue } = useIssues();
+  const { uploadFile } = useFileUpload();
 
   const categories = [
-    { id: "pothole", label: "Roads & Potholes", icon: Car, color: "bg-civic-orange" },
-    { id: "lighting", label: "Street Lighting", icon: Lightbulb, color: "bg-civic-saffron" },
+    { id: "roads", label: "Roads & Potholes", icon: Car, color: "bg-civic-orange" },
+    { id: "streetlights", label: "Street Lighting", icon: Lightbulb, color: "bg-civic-saffron" },
     { id: "garbage", label: "Waste Management", icon: Trash, color: "bg-civic-green" },
     { id: "water", label: "Water & Drainage", icon: Zap, color: "bg-primary" },
     { id: "parks", label: "Parks & Trees", icon: Trees, color: "bg-accent" },
@@ -29,15 +36,7 @@ const ReportIssue = () => {
   const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          if (e.target?.result) {
-            setPhotos(prev => [...prev, e.target!.result as string]);
-          }
-        };
-        reader.readAsDataURL(file);
-      });
+      setPhotos(prev => [...prev, ...Array.from(files)]);
     }
   };
 
@@ -45,7 +44,45 @@ const ReportIssue = () => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
+  const getCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+          setLocation(`Current Location (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`);
+          toast({
+            title: "Location captured",
+            description: "Current location has been added to your report",
+          });
+        },
+        (error) => {
+          toast({
+            title: "Location error",
+            description: "Unable to get your location. Please enter manually.",
+            variant: "destructive",
+          });
+        }
+      );
+    } else {
+      toast({
+        title: "Location not supported",
+        description: "Geolocation is not supported by your browser",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to report issues",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedCategory || !description || !location) {
       toast({
         title: "Missing Information",
@@ -55,19 +92,43 @@ const ReportIssue = () => {
       return;
     }
 
-    setIsSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      toast({
-        title: "Issue Reported Successfully!",
-        description: "Your report has been submitted. You earned 50 citizen points!",
-      });
+    try {
+      let photoUrl = '';
+      
+      // Upload first photo if available
+      if (photos.length > 0) {
+        photoUrl = await uploadFile(photos[0], 'issue-photos') || '';
+      }
+
+      const issueData = {
+        title: title || `${categories.find(c => c.id === selectedCategory)?.label} Issue`,
+        description,
+        category: selectedCategory as any,
+        location_address: location,
+        location_lat: currentLocation?.lat,
+        location_lng: currentLocation?.lng,
+        photo_url: photoUrl,
+      };
+
+      createIssue(issueData);
+      
+      // Reset form
+      setSelectedCategory("");
+      setDescription("");
+      setLocation("");
+      setTitle("");
+      setPhotos([]);
+      setCurrentLocation(null);
       
       // Navigate back to home
       navigate("/");
-      setIsSubmitting(false);
-    }, 2000);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to submit report. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -79,6 +140,20 @@ const ReportIssue = () => {
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Title */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle>Issue Title</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Input
+              placeholder="Brief title for the issue"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </CardContent>
+        </Card>
+
         {/* Category Selection */}
         <Card className="shadow-card">
           <CardHeader>
@@ -138,7 +213,7 @@ const ReportIssue = () => {
                   {photos.map((photo, index) => (
                     <div key={index} className="relative">
                       <img
-                        src={photo}
+                        src={URL.createObjectURL(photo)}
                         alt={`Photo ${index + 1}`}
                         className="w-full h-20 object-cover rounded-lg"
                       />
@@ -173,7 +248,7 @@ const ReportIssue = () => {
               onChange={(e) => setLocation(e.target.value)}
               className="mb-3"
             />
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={getCurrentLocation}>
               <MapPin className="h-4 w-4 mr-2" />
               Use Current Location
             </Button>
@@ -207,9 +282,9 @@ const ReportIssue = () => {
         <Button
           className="w-full h-12 bg-gradient-primary hover:opacity-90 transition-opacity"
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isCreatingIssue}
         >
-          {isSubmitting ? "Submitting..." : "Submit Report"}
+          {isCreatingIssue ? "Submitting..." : "Submit Report"}
         </Button>
       </div>
     </div>
